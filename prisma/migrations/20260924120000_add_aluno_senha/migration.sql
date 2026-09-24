@@ -1,0 +1,1 @@
+ALTER TABLE `Aluno` ADD COLUMN `senhaHash` VARCHAR(191) NULL;
