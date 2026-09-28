@@ -1,9 +1,13 @@
 // Run against the local development server: node tests/student-isolation.cjs
-require('dotenv').config({ quiet: true });
+require('dotenv').config({ path: ['.env.local', '.env'], quiet: true });
 const assert = require('node:assert/strict');
-const { PrismaClient } = require('../generated/prisma/client');
-const { PrismaMariaDb } = require('@prisma/adapter-mariadb');
-const db = new PrismaClient({ adapter: new PrismaMariaDb(process.env.DATABASE_URL) });
+const { createClient } = require('@supabase/supabase-js');
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+async function query(request) {
+  const { data, error } = await request;
+  if (error) throw error;
+  return data;
+}
 const base = 'http://localhost:3000';
 const tag = 'isolation-' + Date.now();
 const { scryptSync, randomBytes } = require('node:crypto');
@@ -18,7 +22,7 @@ async function call(path, cookie = '', method = 'GET', body) {
   try {
     assert.equal((await call('/api/empresas')).status, 401);
     const salt = randomBytes(16).toString('hex');
-    const fixture = await db.professor.create({ data: { nome: 'Professor teste', email: tag + '@teste.local', senhaHash: salt + ':' + scryptSync('TesteSeguro123', salt, 64).toString('hex') } });
+    const fixture = await query(db.from('Professor').insert({ nome: 'Professor teste', email: tag + '@teste.local', senhaHash: salt + ':' + scryptSync('TesteSeguro123', salt, 64).toString('hex') }).select().single());
     professorId = fixture.id;
     const teacher = await call('/api/auth/professor', '', 'POST', { mode: 'login', email: tag + '@teste.local', senha: 'TesteSeguro123' });
     assert.equal(teacher.status, 200); professorId = teacher.data.id;
@@ -27,7 +31,7 @@ async function call(path, cookie = '', method = 'GET', body) {
     const users = [];
     for (const suffix of ['A', 'B']) {
       const created = await call('/api/alunos', teacher.cookie, 'POST', { nome: tag + suffix, matricula: tag + suffix, turmaId, senha: 'TesteSeguro123' });
-      assert.equal(created.status, 201); studentIds.push(created.data.id);
+      assert.equal(created.status, 201); assert.equal('senhaHash' in created.data, false); studentIds.push(created.data.id);
       const login = await call('/api/alunos/login', '', 'POST', { matricula: tag + suffix, senha: 'TesteSeguro123' });
       assert.equal(login.status, 200); users.push(login);
     }
@@ -80,15 +84,15 @@ async function call(path, cookie = '', method = 'GET', body) {
     assert.equal((await call('/api/empresas', a.cookie)).status, 401);
     console.log('PASS: login, isolation, repeated codes, related records, forged IDs, teacher consultation, saved work, activity identity and logout.');
   } finally {
-    await db.sessao.deleteMany({ where: { userId: { in: [...studentIds, ...(professorId ? [professorId] : [])] } } });
-    await db.trabalho.deleteMany({ where: { alunoId: { in: studentIds } } });
-    await db.funcionario.deleteMany({ where: { ownerId: { in: studentIds } } });
-    await db.cargo.deleteMany({ where: { ownerId: { in: studentIds } } });
-    await db.empresa.deleteMany({ where: { ownerId: { in: studentIds } } });
-    await db.notificacao.deleteMany({ where: { mensagem: { contains: tag } } });
-    if (activityId) await db.activity.deleteMany({ where: { id: activityId } });
-    if (turmaId) await db.turma.deleteMany({ where: { id: turmaId } });
-    if (professorId) await db.professor.deleteMany({ where: { id: professorId } });
+    await query(db.from('Sessao').delete().in('userId', [...studentIds, ...(professorId ? [professorId] : [])]));
+    await query(db.from('Trabalho').delete().in('alunoId', studentIds));
+    await query(db.from('Funcionario').delete().in('ownerId', studentIds));
+    await query(db.from('Cargo').delete().in('ownerId', studentIds));
+    await query(db.from('Empresa').delete().in('ownerId', studentIds));
+    await query(db.from('Notificacao').delete().like('mensagem', '%' + tag + '%'));
+    if (activityId) await query(db.from('Activity').delete().eq('id', activityId));
+    if (turmaId) await query(db.from('Turma').delete().eq('id', turmaId));
+    if (professorId) await query(db.from('Professor').delete().eq('id', professorId));
     await db.$disconnect();
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,14 +1,10 @@
 import { withAuth } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query } from '@/lib/supabase';
 import { hashPassword } from '@/lib/student-password';
 
 async function handleGET() {
-  const alunos = await prisma.aluno.findMany({
-    include: { turma: true },
-    omit: { senhaHash: true },
-    orderBy: { nome: 'asc' },
-  });
+  const alunos = await query(getSupabase().from('Aluno').select('id, nome, matricula, turmaId, createdAt, turma:Turma(*)').order('nome', { ascending: true }));
   return NextResponse.json(alunos);
 }
 
@@ -28,17 +24,13 @@ async function handlePOST(request: NextRequest) {
   }
 
   try {
-    const aluno = await prisma.aluno.create({
-      data: { nome: nome.trim(), matricula: matricula.trim(), turmaId, senhaHash: await hashPassword(senha) },
-      include: { turma: true },
-      omit: { senhaHash: true },
-    });
+    const aluno = await query(getSupabase().from('Aluno').insert({ nome: nome.trim(), matricula: matricula.trim(), turmaId, senhaHash: await hashPassword(senha) }).select('id, nome, matricula, turmaId, createdAt, turma:Turma(*)').single());
     return NextResponse.json(aluno, { status: 201 });
   } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23503') {
       return NextResponse.json({ error: 'A turma selecionada não existe mais. Atualize a página e selecione uma turma disponível.' }, { status: 400 });
     }
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
       return NextResponse.json({ error: 'Já existe um aluno com essa matrícula.' }, { status: 409 });
     }
     console.error(error);

@@ -2,58 +2,32 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Configuração local do TalentLab (Windows)
 
-O projeto usa Next.js, Prisma e um banco MySQL. O arquivo `.env` não é
-versionado: cada pessoa deve configurar sua própria conexão.
+O projeto usa Next.js e Supabase (PostgreSQL), acessado por @supabase/supabase-js.
 
-1. Instale as dependências com `npm install`, caso ainda não estejam instaladas.
-2. No PowerShell, execute `Copy-Item .env.example .env` se ainda não tiver `.env`.
-3. No seu MySQL local, crie um banco dedicado ao projeto:
+1. Execute npm install.
+2. No SQL Editor do Supabase, execute [a migracao inicial](supabase/migrations/20260928000000_initial.sql).
+   Ela cria as tabelas e os dez eventos de folha em uma transacao. Execute uma vez;
+   ela nao apaga tabelas existentes nem importa dados do banco anterior.
+3. Copie .env.example para .env.local e configure SUPABASE_URL e SUPABASE_SECRET_KEY.
+   Nunca use NEXT_PUBLIC_ na chave secreta nem envie .env.local ao Git.
+4. Execute npm run dev e acesse http://localhost:3000.
 
-   ```sql
-   CREATE DATABASE talentlab CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
+O primeiro professor cria o cadastro na tela de login. Depois, novos professores
+so podem ser cadastrados por um professor conectado. O professor cria turmas
+e define a senha de cada aluno (6 a 128 caracteres). O aluno entra com matricula
+e senha. Os hashes e as sessoes ficam no Supabase; o login continua sendo o
+do TalentLab, sem usar Supabase Auth. As sessoes duram oito horas e sao revogadas ao sair.
 
-4. Edite `DATABASE_URL` no `.env`, substituindo `USUARIO` e `SENHA` pelas suas
-   credenciais. Ajuste também a porta se seu MySQL não usar 3306. Caracteres
-   especiais nas credenciais precisam de codificação URL (por exemplo, `@` vira `%40`).
-5. Com o banco em execução e a conexão configurada, execute:
+Empresas, cargos, funcionarios, ponto e ASO sao separados por aluno. As rotas
+verificam a sessao e a autoria antes de acessar o banco. As tabelas tem RLS
+habilitado e bloqueiam acesso pelas chaves publicas; apenas o servidor usa a chave secreta.
+Eventos de folha sao compartilhados. O professor consulta registros e trabalhos
+dos alunos em **Consultar alunos**.
 
-   ```powershell
-   npx prisma generate
-   npx prisma migrate deploy
-   npm run dev
-   ```
-
-Acesse http://localhost:3000. As migrations criam as tabelas, mas não copiam
-os dados do banco de quem criou o projeto. Cadastre um professor na tela de
-login e use o cadastro de turmas para adicionar turmas e alunos.
-
-Professores, alunos e turmas ficam no MySQL. O primeiro professor deve criar
-seu cadastro na tela de login; contas antigas que existiam apenas no navegador
-precisam ser cadastradas novamente. Depois do primeiro cadastro, novos professores
-só podem ser cadastrados por um professor conectado (abrindo `/login`, sem sair da sessão).
-O professor define a senha do aluno no cadastro (6 a 128
-caracteres). Apenas o hash da senha é salvo. O login valida matrícula e senha;
-o aluno usa a senha definida pelo professor, sem cadastrar sua própria senha.
-As sessões são verificadas no servidor e duram oito horas. Sair revoga a sessão.
-
-Empresas, cargos, funcionários, ponto e ASO são separados por aluno. Códigos e
-documentos podem ser repetidos entre alunos diferentes. Os registros anteriores
-à separação permanecem no ambiente do professor, pois não tinham autoria registrada.
-Eventos de folha publicados pelo professor são materiais compartilhados.
-
-Em **Consultar alunos**, o professor seleciona um aluno e consulta seus registros
-e atividades concluídas. Folha, custos e RH têm o botão **Salvar trabalho para o
-professor**, que registra uma cópia do resultado naquele momento. Não há notas
-ou comentários nesta área. Os dados de simuladores representam exercícios enviados
-pelo aluno, não resultados auditados automaticamente.
-
-Teste de integração com duas contas e limpeza dos registros temporários:
-`node tests/student-isolation.cjs` (servidor local e MySQL precisam estar rodando).
-Existe também `prisma/seed.ts` com eventos de folha, mas ele não é executado
-automaticamente pelos comandos acima.
-
-Nunca envie seu `.env` para o Git. O `.env.example` contém apenas valores de exemplo.
+Veja [o guia do banco](supabase/README.md) para detalhes e validacao manual.
+O teste de integracao usa um servidor local e o banco configurado:
+node tests/student-isolation.cjs.
+Ele cria contas e registros temporarios e os limpa no final.
 
 ## Getting Started
 

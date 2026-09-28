@@ -1,6 +1,6 @@
 import { withAuth, currentUser } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query, execute } from '@/lib/supabase';
 
 // GET /api/activities?alunoId=xxx&turmaId=xxx
 async function handleGET(request: NextRequest) {
@@ -9,20 +9,11 @@ async function handleGET(request: NextRequest) {
   const alunoId = user.role === 'aluno' ? user.id : searchParams.get('alunoId');
   const turmaId = user.role === 'aluno' ? user.turmaId : searchParams.get('turmaId');
 
-  const where: any = {};
-  if (turmaId) {
-    where.OR = [{ turmaId }, { turmaId: null }];
-  }
-
-  const activities = await prisma.activity.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      turma: { include: { _count: { select: { alunos: true } } } },
-      _count: { select: { conclusoes: true } },
-      conclusoes: alunoId ? { where: { alunoId } } : false,
-    },
-  });
+  let requestQuery = getSupabase().from('Activity')
+    .select('*, turma:Turma(nome, alunos:Aluno(id)), conclusoes:AtividadeConclusao(alunoId)')
+    .order('createdAt', { ascending: false });
+  if (turmaId) requestQuery = requestQuery.or('turmaId.is.null,turmaId.eq.' + JSON.stringify(turmaId));
+  const activities = await query(requestQuery);
 
   const resposta = activities.map((a) => ({
     id: a.id,
@@ -36,9 +27,9 @@ async function handleGET(request: NextRequest) {
     createdAt: a.createdAt,
     turmaId: a.turmaId,
     turmaNome: a.turma?.nome ?? null,
-    totalAlunosTurma: a.turma?._count.alunos ?? 0,
-    totalConcluidos: a._count.conclusoes,
-    concluidaPeloAluno: alunoId ? a.conclusoes.length > 0 : undefined,
+    totalAlunosTurma: a.turma?.alunos.length ?? 0,
+    totalConcluidos: a.conclusoes.length,
+    concluidaPeloAluno: alunoId ? a.conclusoes.some(c => c.alunoId === alunoId) : undefined,
   }));
 
   return NextResponse.json(resposta);
@@ -53,8 +44,7 @@ async function handlePOST(request: NextRequest) {
     return NextResponse.json({ error: 'Campos obrigatórios faltando.' }, { status: 400 });
   }
 
-  const activity = await prisma.activity.create({
-    data: {
+  const activity = await query(getSupabase().from('Activity').insert({
       type,
       title,
       statement,
@@ -63,20 +53,17 @@ async function handlePOST(request: NextRequest) {
       className: className || '',
       createdBy,
       turmaId: turmaId || null,
-    },
-  });
+    }).select('*').single());
 
   if (turmaId) {
-    const alunos = await prisma.aluno.findMany({ where: { turmaId } });
+    const alunos = await query(getSupabase().from('Aluno').select('*').eq('turmaId', turmaId));
     if (alunos.length > 0) {
-      await prisma.notificacao.createMany({
-        data: alunos.map((al) => ({
+      await execute(getSupabase().from('Notificacao').insert(alunos.map((al) => ({
           mensagem: `Nova atividade publicada: ${title}`,
           tipo: 'NOVA_ATIVIDADE' as const,
           destino: 'ALUNO' as const,
           alunoId: al.id,
-        })),
-      });
+        }))));
     }
   }
 

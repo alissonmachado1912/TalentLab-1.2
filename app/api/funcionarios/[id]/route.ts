@@ -1,6 +1,6 @@
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query } from '@/lib/supabase';
 
 async function handleDELETE(
   request: NextRequest,
@@ -9,9 +9,7 @@ async function handleDELETE(
   const { id } = await params;
 
   try {
-    await prisma.funcionario.delete({
-      where: { id, ownerId: ownerId() },
-    });
+    await query(getSupabase().from('Funcionario').delete().eq('id', id).eq('ownerId', ownerId()).select('*').single());
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(error);

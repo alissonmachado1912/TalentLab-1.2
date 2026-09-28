@@ -1,6 +1,6 @@
 import { withAuth, currentUser } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, execute } from '@/lib/supabase';
 
 async function handlePOST(request: NextRequest) {
   const body = await request.json();
@@ -10,10 +10,7 @@ async function handlePOST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  await prisma.notificacao.updateMany({
-    where: { id: { in: ids }, ...(currentUser().role === 'aluno' ? { alunoId: currentUser().id, destino: 'ALUNO' as const } : { destino: 'PROFESSOR' as const }) },
-    data: { lida: true },
-  });
+  await execute(getSupabase().from('Notificacao').update({ lida: true }).in('id', ids).eq('destino', currentUser().role === 'aluno' ? 'ALUNO' : 'PROFESSOR').match(currentUser().role === 'aluno' ? { alunoId: currentUser().id } : {}));
 
   return NextResponse.json({ ok: true });
 }

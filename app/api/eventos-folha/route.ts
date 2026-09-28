@@ -1,6 +1,6 @@
 import { withAuth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query } from '@/lib/supabase';
 
 async function handlePOST(request: Request) {
   const body = await request.json();
@@ -17,13 +17,13 @@ async function handlePOST(request: Request) {
     return NextResponse.json({ error: 'Este código é reservado para uma regra de cálculo do sistema. Escolha outro código.' }, { status: 400 });
   }
   try {
-    const evento = await prisma.eventoFolha.create({ data: {
+    const evento = await query(getSupabase().from('EventoFolha').insert({
       codigo: codigo.trim(), nome: nome.trim(), tipo, descricaoDidatica: descricaoDidatica.trim(),
       percentualFixa, incideFGTS: tipo === 'PROVENTO' && incideFGTS,
-    } });
+    }).select('*').single());
     return NextResponse.json(evento, { status: 201 });
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
       return NextResponse.json({ error: 'Este código já está cadastrado.' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Não foi possível cadastrar o código.' }, { status: 500 });
@@ -32,9 +32,7 @@ async function handlePOST(request: Request) {
 
 // GET /api/eventos-folha -> lista todos os eventos (INSS, IRRF, Vale Transporte, etc.)
 async function handleGET() {
-  const eventos = await prisma.eventoFolha.findMany({
-    orderBy: { codigo: 'asc' },
-  });
+  const eventos = await query(getSupabase().from('EventoFolha').select('*').order('codigo', { ascending: true }));
   return NextResponse.json(eventos);
 }
 

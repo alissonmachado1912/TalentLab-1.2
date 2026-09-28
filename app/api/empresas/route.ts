@@ -1,17 +1,9 @@
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query } from '@/lib/supabase';
 
 async function handleGET() {
-  const empresas = await prisma.empresa.findMany({
-    where: { ownerId: ownerId() },
-    orderBy: { razaoSocial: 'asc' },
-    include: {
-      _count: {
-        select: { setores: true, funcionarios: true },
-      },
-    },
-  });
+  const empresas = await query(getSupabase().from('Empresa').select('*, setores:Setor(id), funcionarios:Funcionario(id)').eq('ownerId', ownerId()).order('razaoSocial', { ascending: true }));
 
   const resposta = empresas.map((empresa) => ({
     id: empresa.id,
@@ -19,8 +11,8 @@ async function handleGET() {
     nomeFantasia: empresa.nomeFantasia,
     cnpj: empresa.cnpj,
     cidadeUF: empresa.cidadeUF,
-    setoresCount: empresa._count.setores,
-    funcionariosCount: empresa._count.funcionarios,
+    setoresCount: empresa.setores.length,
+    funcionariosCount: empresa.funcionarios.length,
   }));
 
   return NextResponse.json(resposta);
@@ -37,9 +29,7 @@ async function handlePOST(request: NextRequest) {
     );
   }
 
-  const empresa = await prisma.empresa.create({
-    data: { ownerId: ownerId(), razaoSocial, nomeFantasia, cnpj, cidadeUF },
-  });
+  const empresa = await query(getSupabase().from('Empresa').insert({ ownerId: ownerId(), razaoSocial, nomeFantasia, cnpj, cidadeUF }).select('*').single());
 
   return NextResponse.json(
     { ...empresa, setoresCount: 0, funcionariosCount: 0 },

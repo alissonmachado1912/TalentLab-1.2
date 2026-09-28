@@ -1,12 +1,9 @@
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query } from '@/lib/supabase';
 
 async function handleGET() {
-  const cargos = await prisma.cargo.findMany({
-    where: { ownerId: ownerId() },
-    orderBy: { titulo: 'asc' },
-  });
+  const cargos = await query(getSupabase().from('Cargo').select('*').eq('ownerId', ownerId()).order('titulo', { ascending: true }));
   return NextResponse.json(cargos);
 }
 
@@ -28,16 +25,14 @@ async function handlePOST(request: NextRequest) {
     );
   }
 
-  const cargo = await prisma.cargo.create({
-    data: { ownerId: ownerId(),
+  const cargo = await query(getSupabase().from('Cargo').insert({ ownerId: ownerId(),
       codigo: codigo.toUpperCase(),
       titulo,
       salarioBase: Number(salarioBase),
       jornadaMensal: Number(jornadaMensal),
       adicionalInsalubridade: Boolean(adicionalInsalubridade),
       adicionalPericulosidade: Boolean(adicionalPericulosidade),
-    },
-  });
+    }).select('*').single());
 
   return NextResponse.json(cargo, { status: 201 });
 }

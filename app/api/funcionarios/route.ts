@@ -1,13 +1,9 @@
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query, optional } from '@/lib/supabase';
 
 async function handleGET() {
-  const funcionarios = await prisma.funcionario.findMany({
-    where: { ownerId: ownerId() },
-    include: { empresa: true, cargo: true },
-    orderBy: { nome: 'asc' },
-  });
+  const funcionarios = await query(getSupabase().from('Funcionario').select('*, empresa:Empresa(*), cargo:Cargo(*)').eq('ownerId', ownerId()).order('nome', { ascending: true }));
   return NextResponse.json(funcionarios);
 }
 
@@ -32,12 +28,11 @@ async function handlePOST(request: NextRequest) {
   }
 
   const [empresa, cargo] = await Promise.all([
-    prisma.empresa.findFirst({ where: { id: empresaId, ownerId: ownerId() } }),
-    prisma.cargo.findFirst({ where: { id: cargoId, ownerId: ownerId() } }),
+    optional(getSupabase().from('Empresa').select('*').eq('id', empresaId).eq('ownerId', ownerId()).limit(1).maybeSingle()),
+    optional(getSupabase().from('Cargo').select('*').eq('id', cargoId).eq('ownerId', ownerId()).limit(1).maybeSingle()),
   ]);
   if (!empresa || !cargo) return NextResponse.json({ error: 'Selecione empresa e cargo do seu ambiente.' }, { status: 403 });
-  const funcionario = await prisma.funcionario.create({
-    data: { ownerId: ownerId(),
+  const funcionario = await query(getSupabase().from('Funcionario').insert({ ownerId: ownerId(),
       codigo: codigo.toUpperCase(),
       nome,
       cpf,
@@ -45,10 +40,8 @@ async function handlePOST(request: NextRequest) {
       cargoId,
       salarioBase: Number(salarioBase),
       dependentes: Number(dependentes ?? 0),
-      dataAdmissao: new Date(dataAdmissao),
-    },
-    include: { empresa: true, cargo: true },
-  });
+      dataAdmissao: new Date(dataAdmissao).toISOString(),
+    }).select('*, empresa:Empresa(*), cargo:Cargo(*)').single());
 
   return NextResponse.json(funcionario, { status: 201 });
 }

@@ -1,13 +1,9 @@
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query, optional } from '@/lib/supabase';
 
 async function handleGET() {
-  const asos = await prisma.registroASO.findMany({
-    where: { funcionario: { ownerId: ownerId() } },
-    include: { funcionario: true },
-    orderBy: { data: 'desc' },
-  });
+  const asos = await query(getSupabase().from('RegistroASO').select('*, funcionario:Funcionario!inner(*)').eq('funcionario.ownerId', ownerId()).order('data', { ascending: false }));
   return NextResponse.json(asos);
 }
 
@@ -22,18 +18,15 @@ async function handlePOST(request: NextRequest) {
     );
   }
 
-  const funcionario = await prisma.funcionario.findFirst({ where: { id: funcionarioId, ownerId: ownerId() } });
+  const funcionario = await optional(getSupabase().from('Funcionario').select('*').eq('id', funcionarioId).eq('ownerId', ownerId()).limit(1).maybeSingle());
   if (!funcionario) return NextResponse.json({ error: 'Funcionário não encontrado no seu ambiente.' }, { status: 403 });
-  const registro = await prisma.registroASO.create({
-    data: {
+  const registro = await query(getSupabase().from('RegistroASO').insert({
       funcionarioId,
       tipo,
       medico,
-      data: new Date(data),
+      data: new Date(data).toISOString(),
       resultado: resultado || 'APTO',
-    },
-    include: { funcionario: true },
-  });
+    }).select('*, funcionario:Funcionario(*)').single());
 
   return NextResponse.json(registro, { status: 201 });
 }

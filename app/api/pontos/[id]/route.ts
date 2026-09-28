@@ -1,6 +1,6 @@
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getSupabase, query, optional } from '@/lib/supabase';
 
 async function handleDELETE(
   request: NextRequest,
@@ -9,9 +9,12 @@ async function handleDELETE(
   const { id } = await params;
 
   try {
-    await prisma.registroPonto.delete({
-      where: { id, funcionario: { ownerId: ownerId() } },
-    });
+    const ponto = await optional(getSupabase().from('RegistroPonto')
+      .select('id, funcionarioId, funcionario:Funcionario!inner(id)')
+      .eq('id', id).eq('funcionario.ownerId', ownerId()).maybeSingle());
+    if (!ponto) return NextResponse.json({ error: 'Registro n?o encontrado.' }, { status: 404 });
+    await query(getSupabase().from('RegistroPonto').delete()
+      .eq('id', id).eq('funcionarioId', ponto.funcionarioId).select('id').single());
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(error);
