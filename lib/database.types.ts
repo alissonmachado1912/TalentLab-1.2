@@ -80,6 +80,8 @@ export type Database = {
           empresaId: string;
           nome: string;
           cpf: string;
+          sexo: string | null;
+          dataNascimento: string | null;
           cargoId: string;
           salarioBase: number;
           dependentes: number;
@@ -94,6 +96,8 @@ export type Database = {
           empresaId: string;
           nome: string;
           cpf: string;
+          sexo?: string | null;
+          dataNascimento?: string | null;
           cargoId: string;
           salarioBase: number;
           dependentes?: number;

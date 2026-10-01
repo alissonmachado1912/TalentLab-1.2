@@ -1,3 +1,4 @@
+import { validDemographics } from '@/lib/employee-demographics';
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, query, optional } from '@/lib/supabase';
@@ -9,6 +10,7 @@ async function handleGET() {
 
 async function handlePOST(request: NextRequest) {
   const body = await request.json();
+  if (!validDemographics(body.sexo, body.dataNascimento)) return NextResponse.json({ error: 'Informe sexo e data de nascimento válida.' }, { status: 400 });
   const {
     codigo,
     nome,
@@ -36,6 +38,8 @@ async function handlePOST(request: NextRequest) {
       codigo: codigo.toUpperCase(),
       nome,
       cpf,
+      sexo: body.sexo,
+      dataNascimento: body.dataNascimento,
       empresaId,
       cargoId,
       salarioBase: Number(salarioBase),

@@ -10,11 +10,12 @@ async function handleGET(request: NextRequest) {
   const turmaId = user.role === 'aluno' ? user.turmaId : searchParams.get('turmaId');
 
   let requestQuery = getSupabase().from('Activity')
-    .select('*, turma:Turma(nome, alunos:Aluno(id)), conclusoes:AtividadeConclusao(alunoId)')
+    .select('*, turma:Turma(nome, alunos:Aluno(id,nome,matricula)), conclusoes:AtividadeConclusao(alunoId,concluidaEm)')
     .order('createdAt', { ascending: false });
   if (turmaId) requestQuery = requestQuery.or('turmaId.is.null,turmaId.eq.' + JSON.stringify(turmaId));
   const activities = await query(requestQuery);
 
+  const todos = user.role === 'professor' && activities.some(a => !a.turmaId) ? await query(getSupabase().from('Aluno').select('id,nome,matricula')) : [];
   const resposta = activities.map((a) => ({
     id: a.id,
     type: a.type,
@@ -27,8 +28,10 @@ async function handleGET(request: NextRequest) {
     createdAt: a.createdAt,
     turmaId: a.turmaId,
     turmaNome: a.turma?.nome ?? null,
-    totalAlunosTurma: a.turma?.alunos.length ?? 0,
+    totalAlunosTurma: a.turma?.alunos.length ?? todos.length,
     totalConcluidos: a.conclusoes.length,
+    participantes: user.role === 'professor' ? (a.turma?.alunos || todos).map(al => ({ ...al, concluidaEm: a.conclusoes.find(c => c.alunoId === al.id)?.concluidaEm || null })) : undefined,
+    concluidaEm: alunoId ? a.conclusoes.find(c => c.alunoId === alunoId)?.concluidaEm || null : undefined,
     concluidaPeloAluno: alunoId ? a.conclusoes.some(c => c.alunoId === alunoId) : undefined,
   }));
 
@@ -44,6 +47,7 @@ async function handlePOST(request: NextRequest) {
     return NextResponse.json({ error: 'Campos obrigatórios faltando.' }, { status: 400 });
   }
 
+  if (!turmaId || !(await query(getSupabase().from('Turma').select('id').eq('id', turmaId))).length) return NextResponse.json({ error: 'Selecione uma turma válida antes de publicar.' }, { status: 400 });
   const activity = await query(getSupabase().from('Activity').insert({
       type,
       title,
@@ -51,7 +55,7 @@ async function handlePOST(request: NextRequest) {
       instructions,
       mechanism,
       className: className || '',
-      createdBy,
+      createdBy: currentUser().name,
       turmaId: turmaId || null,
     }).select('*').single());
 

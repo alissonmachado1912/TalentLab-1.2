@@ -20,3 +20,7 @@ UUIDs gerados pelo PostgreSQL, permitindo importar IDs antigos se necess?rio.
 Valida??o manual: login/logout dos dois perfis; cadastro e exclus?o de turma/aluno,
 empresa/cargo/funcion?rio; ponto e ASO; publica??o/conclus?o de atividade;
 notifica??es e avalia??o. Verifique tamb?m que um aluno n?o acessa registros de outro.
+
+## Atualização: sexo e nascimento
+
+Execute `migrations/20260929000000_funcionario_dados_pessoais.sql` no SQL Editor do Supabase. Não execute novamente a migração inicial. Depois, use **Funcionários → Dados pessoais** para completar funcionários existentes. Esses dados são exibidos automaticamente na ASO.

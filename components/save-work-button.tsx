@@ -13,7 +13,7 @@ export default function SaveWorkButton({ tipo, dados }: { tipo: string; dados: R
     <button type="button" disabled={busy} className="bg-red-600 text-white rounded px-4 py-2 text-sm font-bold disabled:opacity-50" onClick={async () => {
       setBusy(true); setMessage('');
       try {
-        const response = await fetch('/api/trabalhos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, dados }) });
+        const response = await fetch('/api/trabalhos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, dados, atividadeId: new URLSearchParams(window.location.search).get('atividade') }) });
         const result = await response.json();
         setMessage(response.ok ? 'Trabalho salvo para consulta do professor.' : result.error || 'Erro ao salvar.');
       } catch { setMessage('Erro de conexão. Tente novamente.'); }

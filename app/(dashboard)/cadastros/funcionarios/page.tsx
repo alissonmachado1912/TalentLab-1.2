@@ -1,5 +1,6 @@
 'use client';
 
+import EmployeeDemographicsForm from '@/components/employee-demographics-form';
 import { useEffect, useState } from 'react';
 import { Plus, UserPlus, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -22,6 +23,8 @@ interface Funcionario {
   codigo: string;
   nome: string;
   cpf: string;
+  sexo?: string | null;
+  dataNascimento?: string | null;
   salarioBase: number;
   dependentes: number;
   dataAdmissao: string;
@@ -34,12 +37,15 @@ export default function FuncionariosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Funcionario | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     codigo: '',
     nome: '',
     cpf: '',
+    sexo: '',
+    dataNascimento: '',
     empresaId: '',
     codigoCargo: '',
     dependentes: '0',
@@ -99,6 +105,8 @@ export default function FuncionariosPage() {
           codigo: form.codigo,
           nome: form.nome,
           cpf: form.cpf,
+          sexo: form.sexo,
+          dataNascimento: form.dataNascimento,
           empresaId: form.empresaId,
           cargoId: cargoEncontrado.id,
           salarioBase: cargoEncontrado.salarioBase,
@@ -119,6 +127,8 @@ export default function FuncionariosPage() {
         codigo: '',
         nome: '',
         cpf: '',
+        sexo: '',
+        dataNascimento: '',
         empresaId: empresas[0]?.id || '',
         codigoCargo: '',
         dependentes: '0',
@@ -155,6 +165,7 @@ export default function FuncionariosPage() {
         </p>
       </div>
 
+      {editing && <EmployeeDemographicsForm key={editing.id} funcionario={editing} onClose={() => setEditing(null)} onSaved={updated => { setFuncionarios(prev => prev.map(f => f.id === editing.id ? { ...f, ...updated } : f)); setEditing(null); }} />}
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
           {erro}
@@ -166,6 +177,12 @@ export default function FuncionariosPage() {
           <UserPlus className="h-4 w-4 text-red-600" /> Admitir Novo Funcionário Simuladamente
         </h2>
         <form onSubmit={handleCadastrar} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <label className="text-xs font-semibold text-slate-600">Sexo
+            <select required value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })} className="block w-full mt-1"><option value="">Selecione</option><option value="MASCULINO">Masculino</option><option value="FEMININO">Feminino</option></select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">Data de nascimento
+            <input required type="date" max={new Date().toISOString().slice(0,10)} value={form.dataNascimento} onChange={e => setForm({ ...form, dataNascimento: e.target.value })} className="block w-full mt-1" />
+          </label>
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Código do Funcionário</label>
             <input
@@ -315,6 +332,7 @@ export default function FuncionariosPage() {
                     R$ {func.salarioBase.toFixed(2)}
                   </td>
                   <td className="p-3 text-center">
+                    <button type="button" onClick={() => setEditing(func)} className="text-xs text-red-600 mr-3">Dados pessoais</button>
                     <button
                       onClick={() => handleApagar(func.id, func.nome)}
                       className="text-slate-400 hover:text-rose-600 transition-colors"

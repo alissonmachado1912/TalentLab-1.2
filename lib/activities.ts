@@ -25,6 +25,8 @@ export type Activity = {
   totalAlunosTurma: number;
   totalConcluidos: number;
   concluidaPeloAluno?: boolean;
+  concluidaEm?: string | null;
+  participantes?: { id: string; nome: string; matricula: string; concluidaEm: string | null }[];
 };
 
 export const activityTypeOptions: { value: ActivityType; label: string }[] = [

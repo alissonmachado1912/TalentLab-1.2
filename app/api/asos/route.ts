@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, query, optional } from '@/lib/supabase';
 
 async function handleGET() {
-  const asos = await query(getSupabase().from('RegistroASO').select('*, funcionario:Funcionario!inner(*)').eq('funcionario.ownerId', ownerId()).order('data', { ascending: false }));
+  const asos = await query(getSupabase().from('RegistroASO').select('*, funcionario:Funcionario!inner(*, empresa:Empresa(razaoSocial,cnpj), cargo:Cargo(titulo))').eq('funcionario.ownerId', ownerId()).order('data', { ascending: false }));
   return NextResponse.json(asos);
 }
 
@@ -26,7 +26,7 @@ async function handlePOST(request: NextRequest) {
       medico,
       data: new Date(data).toISOString(),
       resultado: resultado || 'APTO',
-    }).select('*, funcionario:Funcionario(*)').single());
+    }).select('*, funcionario:Funcionario(*, empresa:Empresa(razaoSocial,cnpj), cargo:Cargo(titulo))').single());
 
   return NextResponse.json(registro, { status: 201 });
 }

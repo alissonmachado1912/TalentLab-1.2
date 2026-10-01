@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import ActivityDelivery from '@/components/activity-delivery';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import {
   Activity,
   ActivityType,
@@ -30,31 +31,40 @@ export default function ActivitiesPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  async function carregarAtividades(u: User) {
+  const [loadError, setLoadError] = useState('');
+  const carregarAtividades = useCallback(async (u: User) => {
     setLoading(true);
+    setLoadError('');
     try {
       const params = new URLSearchParams();
       if (u.role === 'aluno' && u.alunoId) params.set('alunoId', u.alunoId);
       if (u.role === 'aluno' && u.turmaId) params.set('turmaId', u.turmaId);
       const res = await fetch(`/api/activities?${params.toString()}`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível carregar as atividades.');
       setActivities(data);
-    } finally {
+    } catch(e) { setLoadError(e instanceof Error ? e.message : 'Erro de conexão.'); } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    let parsedUser: User | null = null;
-    try {
-      parsedUser = JSON.parse(localStorage.getItem('talentlab_current_user') || 'null');
-    } catch {
-      parsedUser = null;
-    }
-    setUser(parsedUser);
-    if (parsedUser) carregarAtividades(parsedUser);
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/auth/session', { signal: controller.signal }).then(async r => {
+      if (!r.ok) throw new Error('Entre novamente para acessar as atividades.');
+      const session = await r.json(); if (controller.signal.aborted) return;
+      setUser(session); await carregarAtividades(session);
+    }).catch(e => { if (!controller.signal.aborted) setLoadError(e.message); });
+    return () => controller.abort();
+  }, [carregarAtividades]);
+  useEffect(() => {
+    if (!user) return;
+    const refresh = () => { if (document.visibilityState === 'visible') void carregarAtividades(user); };
+    window.addEventListener('focus', refresh);
+    const interval = setInterval(refresh, 30000);
+    return () => { window.removeEventListener('focus', refresh); clearInterval(interval); };
+  }, [user, carregarAtividades]);
+  if (loadError) return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">{loadError}<button className="ml-3 underline" onClick={() => user ? carregarAtividades(user) : window.location.reload()}>Tentar novamente</button></div>;
   if (!user) return null;
 
   return user.role === 'professor' ? (
@@ -131,14 +141,15 @@ function CreateActivityForm({ user, onCreated, onCancel }: { user: User; onCreat
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaId, setTurmaId] = useState('');
   const [error, setError] = useState('');
+  const [publishing,setPublishing] = useState(false);
 
   useEffect(() => {
     fetch('/api/turmas')
-      .then((res) => res.json())
+      .then((res) => { if (!res.ok) throw new Error('Não foi possível carregar as turmas.'); return res.json(); })
       .then((data) => {
         setTurmas(data);
         setTurmaId((prev) => prev || data[0]?.id || '');
-      });
+      }).catch(e => setError(e.message));
   }, []);
 
   const submit = async (e: FormEvent) => {
@@ -147,6 +158,9 @@ function CreateActivityForm({ user, onCreated, onCancel }: { user: User; onCreat
       setError('Preencha o título, o enunciado e as instruções.');
       return;
     }
+    if (publishing) return;
+    if (!turmaId) { setError('Selecione uma turma antes de publicar.'); return; }
+    setPublishing(true);
     setError('');
     try {
       const res = await fetch('/api/activities', {
@@ -171,7 +185,7 @@ function CreateActivityForm({ user, onCreated, onCancel }: { user: User; onCreat
       onCreated();
     } catch {
       setError('Erro de conexão com o servidor.');
-    }
+    } finally { setPublishing(false); }
   };
 
   return (
@@ -197,7 +211,7 @@ function CreateActivityForm({ user, onCreated, onCancel }: { user: User; onCreat
         </div>
         <div className="rounded-lg bg-slate-50 border border-slate-200 p-4"><p className="text-xs font-bold text-slate-700">Ferramenta selecionada</p><p className="text-sm font-black text-slate-900 mt-1">{getMechanism(mechanism).label}</p><p className="text-xs text-slate-500 mt-1">{getMechanism(mechanism).description}</p></div>
         {error && <p className="text-xs font-semibold text-red-600 bg-red-50 border border-red-100 p-3 rounded-sm">{error}</p>}
-        <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-sm">Cancelar</button><button type="submit" className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-red-600 hover:bg-red-700 text-white rounded-sm"><Send className="h-4 w-4" /> Publicar atividade</button></div>
+        <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-sm">Cancelar</button><button type="submit" disabled={publishing || !turmaId} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-red-600 hover:bg-red-700 text-white rounded-sm"><Send className="h-4 w-4" /> {publishing ? 'Publicando...' : 'Publicar atividade'}</button></div>
       </form>
     </section>
   );
@@ -229,6 +243,7 @@ function TeacherActivityCard({ activity, onDeleted }: { activity: Activity; onDe
             {activity.type === 'simulacao' ? 'Simulação' : activity.type === 'documento' ? 'Documento' : activity.type === 'calculo' ? 'Cálculo' : 'Prática operacional'}
             {activity.turmaNome ? ` • ${activity.turmaNome}` : ''} • Publicada em {new Date(activity.createdAt).toLocaleDateString('pt-BR')}
           </p>
+          <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-bold text-slate-700">Acompanhar entregas · {activity.totalConcluidos} concluída(s)</summary><div className="mt-3 space-y-2">{activity.participantes?.length ? activity.participantes.map(al=><div key={al.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-2 text-xs"><span>{al.nome} · {al.matricula}</span><span className={al.concluidaEm ? 'font-bold text-emerald-700' : 'text-amber-700'}>{al.concluidaEm ? 'Concluída em ' + new Date(al.concluidaEm).toLocaleString('pt-BR') : 'Pendente'}</span>{al.concluidaEm && <ActivityDelivery activityId={activity.id} alunoId={al.id} nome={al.nome} />}</div>) : <p className="text-xs text-slate-500">Nenhum aluno nesta turma.</p>}</div></details>
           <p className="text-sm text-slate-700 mt-3 line-clamp-2">{activity.statement}</p>
           <div className="mt-3 p-3 rounded-lg bg-white border border-slate-200"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Instruções</p><p className="text-xs text-slate-600 mt-1 line-clamp-2">{activity.instructions}</p></div>
         </div>
@@ -246,6 +261,7 @@ function StudentActivities({ activities, loading, user, onChanged }: { activitie
         <h1 className="text-2xl font-black text-slate-900 mt-1">Atividades</h1>
         <p className="text-sm text-slate-500 mt-1">Veja o enunciado e as instruções antes de abrir a ferramenta indicada pelo professor.</p>
       </div>
+      <div className="grid grid-cols-3 gap-3">{[['Disponíveis',activities.length],['Pendentes',activities.filter(a=>!a.concluidaPeloAluno).length],['Concluídas',activities.filter(a=>a.concluidaPeloAluno).length]].map(([label,value])=><div key={label} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-black">{value}</p></div>)}</div>
       {loading ? (
         <p className="text-sm text-slate-500">Carregando...</p>
       ) : activities.length === 0 ? (
@@ -265,9 +281,11 @@ function StudentActivityCard({ activity, user, onChanged }: { activity: Activity
   const mechanism = getMechanism(activity.mechanism);
   const [marcando, setMarcando] = useState(false);
   const [erro, setErro] = useState('');
+  const [done,setDone] = useState(false);
+  const completed = done || activity.concluidaPeloAluno;
 
   const marcarConcluida = async () => {
-    if (!user.alunoId) return;
+    if (marcando) return;
     setMarcando(true);
     setErro('');
     try {
@@ -281,8 +299,9 @@ function StudentActivityCard({ activity, user, onChanged }: { activity: Activity
         setErro(data.error || 'Erro ao marcar como concluída.');
         return;
       }
+      setDone(true);
       onChanged();
-    } finally {
+    } catch { setErro('Erro de conexão. Tente novamente.'); } finally {
       setMarcando(false);
     }
   };
@@ -292,7 +311,7 @@ function StudentActivityCard({ activity, user, onChanged }: { activity: Activity
       <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-start gap-3">
         <div className="h-10 w-10 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0"><ClipboardList className="h-5 w-5" /></div>
         <div className="min-w-0"><h2 className="font-black text-slate-900">{activity.title}</h2><p className="text-xs text-slate-500 mt-1">{activity.createdBy} • {new Date(activity.createdAt).toLocaleDateString('pt-BR')}</p></div>
-        {activity.concluidaPeloAluno && (
+        {completed && (
           <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
             <CheckCircle2 className="h-3 w-3" /> Concluída
           </span>
@@ -309,7 +328,7 @@ function StudentActivityCard({ activity, user, onChanged }: { activity: Activity
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">Ferramenta: <strong className="text-slate-700">{mechanism.label}</strong></p>
           <div className="flex items-center gap-2">
-            {!activity.concluidaPeloAluno && (
+            {!completed && (
               <button
                 onClick={marcarConcluida}
                 disabled={marcando}
@@ -319,7 +338,7 @@ function StudentActivityCard({ activity, user, onChanged }: { activity: Activity
               </button>
             )}
             <Link href={`${mechanism.href}?atividade=${activity.id}`} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm px-4 py-2.5 rounded-sm">
-              Iniciar atividade <ArrowUpRight className="h-4 w-4" />
+              {completed ? 'Revisar atividade' : 'Iniciar atividade'} <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

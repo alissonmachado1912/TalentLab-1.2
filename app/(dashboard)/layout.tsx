@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import ActivityWorkPanel from '@/components/activity-work-panel';
+import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/sidebar';
 import Header from '@/components/header';
@@ -32,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 bg-[#f5f5f5]">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6 bg-[#f5f5f5]"><Suspense fallback={null}><ActivityWorkPanel /></Suspense>{children}</main>
       </div>
     </div>
   );

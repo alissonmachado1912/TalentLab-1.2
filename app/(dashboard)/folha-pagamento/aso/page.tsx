@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { FileCheck, Plus } from 'lucide-react';
+import ASOReportModal, { type ASOReport, formatASODate } from '@/components/aso-report-modal';
 import CodeHelpButton from '@/components/code-help-button';
 
 interface FuncionarioAPI {
@@ -13,16 +14,12 @@ interface FuncionarioAPI {
   nome: string;
 }
 
-interface RegistroASO {
-  id: string;
-  funcionario: FuncionarioAPI;
-  tipo: string;
-  medico: string;
-  data: string;
-  resultado: 'APTO' | 'INAPTO';
-}
+type RegistroASO = ASOReport;
 
 export default function ASOPage() {
+  const [report, setReport] = useState<RegistroASO | null>(null);
+  const [emitting, setEmitting] = useState(false);
+  const closeReport = useCallback(() => setReport(null), []);
   const [asos, setAsos] = useState<RegistroASO[]>([]);
   const [funcionarios, setFuncionarios] = useState<FuncionarioAPI[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,34 +28,35 @@ export default function ASOPage() {
   const [form, setForm] = useState({
     funcionarioId: '',
     tipo: 'ADMISSIONAL',
+    resultado: 'APTO',
     medico: '',
     data: '',
   });
 
-  async function carregarDados() {
-    setLoading(true);
-    try {
-      const [resAsos, resFunc] = await Promise.all([
-        fetch('/api/asos'),
-        fetch('/api/funcionarios'),
-      ]);
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      fetch('/api/asos', { signal: controller.signal }),
+      fetch('/api/funcionarios', { signal: controller.signal }),
+    ]).then(async ([resAsos, resFunc]) => {
+      if (!resAsos.ok || !resFunc.ok) throw new Error('Erro ao carregar');
       const [dataAsos, dataFunc] = await Promise.all([resAsos.json(), resFunc.json()]);
+      if (controller.signal.aborted) return;
       setAsos(dataAsos);
       setFuncionarios(dataFunc);
-      setForm((prev) => ({ ...prev, funcionarioId: prev.funcionarioId || dataFunc[0]?.id || '' }));
-    } catch {
-      setErro('Não foi possível carregar os dados.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    carregarDados();
+      setForm(prev => ({ ...prev, funcionarioId: prev.funcionarioId || dataFunc[0]?.id || '' }));
+    }).catch(() => {
+      if (!controller.signal.aborted) setErro('Não foi possível carregar os dados.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
   }, []);
 
   const handleEmitir = async () => {
-    if (!form.funcionarioId || !form.medico || !form.data) return;
+    if (emitting) return;
+    if (!form.funcionarioId || !form.medico.trim() || !form.data) { setErro('Preencha funcionário, médico e data para emitir a ASO.'); return; }
+    setEmitting(true);
     setErro(null);
     try {
       const res = await fetch('/api/asos', {
@@ -73,10 +71,11 @@ export default function ASOPage() {
       }
       const novo: RegistroASO = await res.json();
       setAsos((prev) => [novo, ...prev]);
-      setForm({ funcionarioId: form.funcionarioId, tipo: 'ADMISSIONAL', medico: '', data: '' });
+      setReport(novo);
+      setForm({ funcionarioId: form.funcionarioId, tipo: 'ADMISSIONAL', resultado: 'APTO', medico: '', data: '' });
     } catch {
       setErro('Erro de conexão com o servidor.');
-    }
+    } finally { setEmitting(false); }
   };
 
   return (
@@ -95,6 +94,7 @@ export default function ASOPage() {
         </div>
       </div>
 
+      {report && <ASOReportModal report={report} onClose={closeReport} />}
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{erro}</div>
       )}
@@ -121,6 +121,7 @@ export default function ASOPage() {
             <option value="ADMISSIONAL">ADMISSIONAL</option>
             <option value="PERIODICO">PERIÓDICO</option>
             <option value="DEMISSIONAL">DEMISSIONAL</option>
+            <option value="MUDANCA DE FUNCAO">MUDANÇA DE FUNÇÃO</option>
             <option value="RETORNO AO TRABALHO">RETORNO AO TRABALHO</option>
           </select>
           <input
@@ -136,8 +137,13 @@ export default function ASOPage() {
             onChange={(e) => setForm({ ...form, data: e.target.value })}
             className="text-xs p-2.5 rounded-lg border border-slate-300"
           />
-          <Button size="sm" onClick={handleEmitir} disabled={funcionarios.length === 0} className="md:col-span-4 md:w-fit">
-            <Plus className="h-4 w-4" /> Emitir ASO
+          <label className="text-xs font-semibold">Parecer final
+            <select value={form.resultado} onChange={e => setForm({ ...form, resultado: e.target.value })} className="block w-full mt-1">
+              <option value="APTO">Apto</option><option value="INAPTO">Inapto</option>
+            </select>
+          </label>
+          <Button size="sm" onClick={handleEmitir} disabled={loading || emitting || funcionarios.length === 0} className="md:col-span-4 md:w-fit">
+            <Plus className="h-4 w-4" /> {emitting ? 'Emitindo...' : 'Emitir ASO'}
           </Button>
         </div>
       </Card>
@@ -153,6 +159,7 @@ export default function ASOPage() {
               <th className="p-3">Médico Responsável</th>
               <th className="p-3">Data</th>
               <th className="p-3 text-center">Parecer Final</th>
+              <th className="p-3">Relatório</th>
             </tr>
           </TableHeader>
           <TableBody>
@@ -161,10 +168,11 @@ export default function ASOPage() {
                 <td className="p-3 font-semibold text-slate-800">{a.funcionario.nome}</td>
                 <td className="p-3 text-xs">{a.tipo}</td>
                 <td className="p-3 text-xs text-slate-500">{a.medico}</td>
-                <td className="p-3 text-xs text-slate-500">{new Date(a.data).toLocaleDateString('pt-BR')}</td>
+                <td className="p-3 text-xs text-slate-500">{formatASODate(a.data)}</td>
                 <td className="p-3 text-center">
                   <Badge variant={a.resultado === 'APTO' ? 'emerald' : 'rose'}>{a.resultado}</Badge>
                 </td>
+                <td className="p-3"><Button size="sm" variant="outline" onClick={() => setReport(a)}>Ver relatório</Button></td>
               </tr>
             ))}
           </TableBody>
