@@ -1,5 +1,6 @@
 'use client';
 
+import ProfessorRegistration from '@/components/professor-registration';
 import { useEffect, useState } from 'react';
 import { GraduationCap, Plus, Trash2, Users } from 'lucide-react';
 
@@ -142,20 +143,22 @@ export default function TurmasPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-200 pb-5">
+    <div className="tl-register space-y-7">
+      <div className="tl-page-heading">
         <h1 className="text-2xl font-bold text-slate-900">Turmas & Alunos</h1>
         <p className="text-sm text-slate-500">
           Cadastre turmas e alunos. Defina a matrícula e a senha que cada aluno usará para acessar o sistema.
         </p>
       </div>
 
+      <ProfessorRegistration />
+
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">{erro}</div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="tl-form-card bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
             <GraduationCap className="h-4 w-4 text-red-600" /> Cadastrar Turma
           </h2>
@@ -196,7 +199,7 @@ export default function TurmasPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="tl-form-card bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
             <Users className="h-4 w-4 text-red-600" /> Cadastrar Aluno
           </h2>
@@ -257,7 +260,7 @@ export default function TurmasPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="tl-records bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         <div className="px-5 py-3 border-b border-slate-200">
           <h2 className="text-sm font-bold text-slate-700">Alunos Cadastrados</h2>
         </div>

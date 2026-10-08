@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell, Search, Sparkles, LogOut, CheckCircle2, ClipboardCheck } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 type User = { name: string; identifier: string; role: 'aluno' | 'professor'; alunoId?: string };
@@ -16,6 +16,8 @@ interface Notificacao {
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
+  const pageNames: Record<string,string> = { '/dashboard':'Visão geral', '/atividades':'Atividades', '/avaliacao':'Consultar alunos', '/cadastros/empresas':'Empresas', '/cadastros/cargos':'Cargos e salários', '/cadastros/funcionarios':'Funcionários', '/cadastros/turmas':'Turmas e alunos', '/folha-pagamento/calcular':'Simulador de folha', '/folha-pagamento/ponto':'Ponto diário', '/folha-pagamento/aso':'Saúde ocupacional', '/custos':'Custos de produção', '/simulador-rh':'Simulador de RH' };
   const [user, setUser] = useState<User | null>(null);
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -68,19 +70,17 @@ export default function Header() {
   const roleLabel = user?.role === 'professor' ? 'Professor' : 'Aluno';
 
   return (
-    <header className="h-16 border-b border-neutral-200 bg-white px-6 flex items-center justify-between sticky top-0 z-10">
-      <div className="flex items-center gap-4 w-1/3">
-        <div className="relative w-full max-w-md" />
-      </div>
+    <header className="tl-header flex items-center justify-between gap-3">
+      <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">TalentLab / SENAI-SP</p><p className="mt-1 truncate text-sm font-bold text-slate-800">{pageNames[pathname] || 'TalentLab'}</p></div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {user?.role === 'professor' ? (
-          <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 px-3 py-1.5 rounded-sm">
+          <div className="hidden xl:flex items-center gap-2 bg-red-50/60 border border-red-100 px-3 py-1.5 rounded-full">
             <Sparkles className="h-3.5 w-3.5 text-[#e30613]" />
             <span className="text-xs font-bold text-neutral-800">Painel Administrativo</span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 px-3 py-1.5 rounded-sm">
+          <div className="hidden xl:flex items-center gap-2 bg-red-50/60 border border-red-100 px-3 py-1.5 rounded-full">
             <Sparkles className="h-3.5 w-3.5 text-amber-500" />
             <span className="text-xs font-bold text-neutral-800">1.250 XP</span>
             <span className="text-[10px] bg-[#e30613] text-white font-bold px-1.5 py-0.5 rounded-sm">Nível 3</span>
@@ -88,7 +88,7 @@ export default function Header() {
         )}
 
         <div className="relative">
-          <button onClick={abrirNotificacoes} className="relative p-2 rounded-sm text-neutral-500 hover:bg-neutral-100 transition-colors">
+          <button onClick={abrirNotificacoes} aria-label="Notificações" aria-expanded={aberto} className="relative p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors">
             <Bell className="h-4 w-4" />
             {naoLidas.length > 0 && (
               <span className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-[#e30613] text-white text-[9px] font-bold flex items-center justify-center">
@@ -98,7 +98,7 @@ export default function Header() {
           </button>
 
           {aberto && (
-            <div className="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-lg shadow-xl overflow-hidden z-20">
+            <div className="absolute right-0 mt-3 w-[min(320px,calc(100vw-2rem))] bg-white border border-neutral-200 rounded-lg shadow-xl overflow-hidden z-20">
               <div className="px-4 py-3 border-b border-neutral-100 font-bold text-sm text-neutral-800">Notificações</div>
               <div className="max-h-80 overflow-y-auto divide-y divide-neutral-100">
                 {notificacoes.length === 0 ? (
@@ -126,12 +126,12 @@ export default function Header() {
         <div className="h-6 w-px bg-neutral-200" />
 
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-xs">{initials}</div>
-          <div className="hidden sm:block text-left">
-            <p className="text-xs font-bold text-neutral-900 leading-none">{user?.name || 'Usuário TalentLab'}</p>
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-950 text-white flex items-center justify-center font-bold text-xs">{initials}</div>
+          <div className="hidden md:block text-left max-w-[170px]">
+            <p className="text-xs font-bold text-neutral-900 leading-none truncate">{user?.name || 'Usuário TalentLab'}</p>
             <p className="text-[10px] text-neutral-500 mt-1">{roleLabel} • SENAI-SP</p>
           </div>
-          <button onClick={logout} title="Sair" className="p-2 text-neutral-400 hover:text-[#e30613] hover:bg-red-50 rounded-sm">
+          <button onClick={logout} title="Sair" className="p-2 text-neutral-400 hover:text-[#e30613] hover:bg-red-50 rounded-xl">
             <LogOut className="h-4 w-4" />
           </button>
         </div>

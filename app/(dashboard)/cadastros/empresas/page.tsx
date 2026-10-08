@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Building2, Plus, Layers, Users, MapPin, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Building2, Plus, Layers, Users, MapPin, Trash2, Pencil } from 'lucide-react';
 
 interface EmpresaItem {
   id: string;
@@ -15,6 +15,9 @@ interface EmpresaItem {
 
 export default function EmpresasPage() {
   const [empresas, setEmpresas] = useState<EmpresaItem[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -30,6 +33,7 @@ export default function EmpresasPage() {
     try {
       const res = await fetch('/api/empresas');
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setEmpresas(data);
     } catch {
       setErro('Não foi possível carregar as empresas. Confira se o servidor está rodando.');
@@ -46,10 +50,12 @@ export default function EmpresasPage() {
     e.preventDefault();
     if (!form.razaoSocial || !form.cnpj) return;
 
+    if (saving) return;
+    setSaving(true);
     setErro(null);
     try {
-      const res = await fetch('/api/empresas', {
-        method: 'POST',
+      const res = await fetch(editingId ? `/api/empresas/${editingId}` : '/api/empresas', {
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
@@ -60,12 +66,12 @@ export default function EmpresasPage() {
         return;
       }
 
-      const novaEmpresa: EmpresaItem = await res.json();
-      setEmpresas((prev) => [...prev, novaEmpresa]);
+      await carregarEmpresas();
+      setEditingId(null);
       setForm({ razaoSocial: '', nomeFantasia: '', cnpj: '', cidadeUF: '' });
     } catch {
       setErro('Erro de conexão com o servidor.');
-    }
+    } finally { setSaving(false); }
   };
 
   const handleApagar = async (id: string, nome: string) => {
@@ -86,8 +92,8 @@ export default function EmpresasPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+    <div className="tl-register space-y-7">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 tl-page-heading">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Cadastro de Empresas</h1>
           <p className="text-sm text-slate-500">
@@ -102,11 +108,11 @@ export default function EmpresasPage() {
         </div>
       )}
 
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="tl-form-card bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-red-600" /> Cadastrar Nova Empresa Simulada
+          <Building2 className="h-4 w-4 text-red-600" /> {editingId ? 'Editar Empresa' : 'Cadastrar Nova Empresa Simulada'}
         </h2>
-        <form onSubmit={handleCadastrar} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form ref={formRef} onSubmit={handleCadastrar} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Razão Social</label>
             <input
@@ -149,18 +155,19 @@ export default function EmpresasPage() {
               className="w-full text-sm p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-600"
             />
           </div>
-          <div className="md:col-span-4 flex justify-end">
+          <div className="sm:col-span-2 xl:col-span-4 flex justify-end">
             <button
-              type="submit"
+              type="submit" disabled={saving}
               className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors shadow-sm"
             >
-              <Plus className="h-4 w-4" /> Adicionar Empresa
+              <Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Adicionar Empresa'}
             </button>
           </div>
+          {editingId && <button type="button" className="text-xs text-red-600" onClick={() => { setEditingId(null); setForm({ razaoSocial: '', nomeFantasia: '', cnpj: '', cidadeUF: '' }); }}>Cancelar edição</button>}
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="tl-records bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Carregando...</p>
         ) : (
@@ -197,6 +204,7 @@ export default function EmpresasPage() {
                     </span>
                   </td>
                   <td className="p-3 text-center">
+                    <button type="button" title="Editar empresa" aria-label="Editar empresa" disabled={saving} className="text-slate-400 hover:text-rose-600 mr-3" onClick={() => { setEditingId(emp.id); setErro(null); setForm({ razaoSocial: emp.razaoSocial, nomeFantasia: emp.nomeFantasia || '', cnpj: emp.cnpj, cidadeUF: emp.cidadeUF || '' }); formRef.current?.scrollIntoView({ block: 'start' }); }}><Pencil className="h-4 w-4" /></button>
                     <button
                       onClick={() => handleApagar(emp.id, emp.razaoSocial)}
                       className="text-slate-400 hover:text-rose-600 transition-colors"

@@ -1,15 +1,23 @@
+import { validEmployeeNotes } from '@/lib/registration-validation';
 import { validDemographics } from '@/lib/employee-demographics';
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, query, optional } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
 
 async function handleGET() {
-  const funcionarios = await query(getSupabase().from('Funcionario').select('*, empresa:Empresa(*), cargo:Cargo(*)').eq('ownerId', ownerId()).order('nome', { ascending: true }));
+  const funcionarios: (Database['public']['Tables']['Funcionario']['Row'] & { empresa: unknown; cargo: unknown })[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const batch = await query(getSupabase().from('Funcionario').select('*, empresa:Empresa(*), cargo:Cargo(*)').eq('ownerId', ownerId()).order('nome', { ascending: true }).order('id').range(offset, offset + 999));
+    funcionarios.push(...batch);
+    if (batch.length < 1000) break;
+  }
   return NextResponse.json(funcionarios);
 }
 
 async function handlePOST(request: NextRequest) {
   const body = await request.json();
+  if (!validEmployeeNotes(body)) return NextResponse.json({ error: 'Observações ou PCD inválidos.' }, { status: 400 });
   if (!validDemographics(body.sexo, body.dataNascimento)) return NextResponse.json({ error: 'Informe sexo e data de nascimento válida.' }, { status: 400 });
   const {
     codigo,
@@ -38,11 +46,13 @@ async function handlePOST(request: NextRequest) {
       codigo: codigo.toUpperCase(),
       nome,
       cpf,
+      observacoes: body.observacoes ?? '',
+      pcd: body.pcd ?? false,
       sexo: body.sexo,
       dataNascimento: body.dataNascimento,
       empresaId,
       cargoId,
-      salarioBase: Number(salarioBase),
+      salarioBase: cargo.salarioBase,
       dependentes: Number(dependentes ?? 0),
       dataAdmissao: new Date(dataAdmissao).toISOString(),
     }).select('*, empresa:Empresa(*), cargo:Cargo(*)').single());

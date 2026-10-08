@@ -29,11 +29,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!ready) return <div className="min-h-screen bg-[#f5f5f5]" />;
 
   return (
-    <div className="flex h-screen bg-[#f5f5f5]">
+    <div className="tl-shell flex h-dvh flex-col lg:flex-row">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 bg-[#f5f5f5]"><Suspense fallback={null}><ActivityWorkPanel /></Suspense>{children}</main>
+        <main className="tl-main min-h-0 flex-1 overflow-y-auto"><Suspense fallback={null}><ActivityWorkPanel /></Suspense><div className="mx-auto w-full max-w-[1500px]">{children}</div></main>
       </div>
     </div>
   );

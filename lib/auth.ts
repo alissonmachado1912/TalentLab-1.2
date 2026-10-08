@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getSupabase, query, optional, execute } from './supabase';
+import { missingSchema } from './schema-errors';
 
 type User = { id: string; role: string; name: string; identifier: string; alunoId?: string; turmaId?: string; turmaNome?: string };
 const context = new AsyncLocalStorage<User>();
@@ -50,6 +51,7 @@ export function withAuth<Args extends unknown[]>(handler: (...args: Args) => Pro
     return context.run(user, async () => {
       try { return await handler(...args); }
       catch (error) {
+        if (missingSchema(error)) return NextResponse.json({ error: 'O banco ainda precisa da atualização dos novos campos e tabelas. A migration pendente deve ser aplicada por um responsável autorizado.' }, { status: 503 });
         const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
         if (code === '23505') return NextResponse.json({ error: 'Já existe um cadastro com este código ou documento no seu ambiente.' }, { status: 409 });
         if (code === 'PGRST116') return NextResponse.json({ error: 'Registro não encontrado.' }, { status: 404 });

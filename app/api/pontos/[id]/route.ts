@@ -17,6 +17,7 @@ async function handleDELETE(
       .eq('id', id).eq('funcionarioId', ponto.funcionarioId).select('id').single());
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && ['23503', '23001'].includes(String(error.code))) return NextResponse.json({ error: 'Este ponto está vinculado a um lançamento de horas extras na folha.' }, { status: 409 });
     console.error(error);
     return NextResponse.json({ error: 'Erro ao apagar registro de ponto.' }, { status: 500 });
   }

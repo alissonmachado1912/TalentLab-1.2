@@ -80,6 +80,8 @@ export type Database = {
           empresaId: string;
           nome: string;
           cpf: string;
+          observacoes: string;
+          pcd: boolean | null;
           sexo: string | null;
           dataNascimento: string | null;
           cargoId: string;
@@ -96,6 +98,8 @@ export type Database = {
           empresaId: string;
           nome: string;
           cpf: string;
+          observacoes?: string;
+          pcd?: boolean | null;
           sexo?: string | null;
           dataNascimento?: string | null;
           cargoId: string;
@@ -110,6 +114,18 @@ export type Database = {
           { foreignKeyName: "Funcionario_empresaId_fkey"; columns: ["empresaId"]; isOneToOne: false; referencedRelation: "Empresa"; referencedColumns: ["id"] },
           { foreignKeyName: "Funcionario_cargoId_fkey"; columns: ["cargoId"]; isOneToOne: false; referencedRelation: "Cargo"; referencedColumns: ["id"] }
         ];
+      };
+      LancamentoHoraExtra: {
+        Row: { id: string; funcionarioId: string; inicio: string; fim: string; folhaId: string; itemFolhaId: string; minutos: number; createdAt: string };
+        Insert: { id?: string; funcionarioId: string; inicio: string; fim: string; folhaId: string; itemFolhaId: string; minutos: number; createdAt?: string };
+        Update: Partial<Database['public']['Tables']['LancamentoHoraExtra']['Insert']>;
+        Relationships: [];
+      };
+      LancamentoHoraExtraPonto: {
+        Row: { pontoId: string; lancamentoId: string; minutos: number };
+        Insert: { pontoId: string; lancamentoId: string; minutos: number };
+        Update: Partial<Database['public']['Tables']['LancamentoHoraExtraPonto']['Insert']>;
+        Relationships: [];
       };
       RegistroPonto: {
         Row: {
@@ -411,7 +427,7 @@ export type Database = {
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: { confirmar_horas_extras: { Args: { p_owner: string; p_funcionario: string; p_inicio: string; p_salario: number; p_pontos: Json }; Returns: Json } };
     Enums: {
       TipoEvento: "PROVENTO" | "DESCONTO";
       TipoAtividade: "pratica" | "simulacao" | "documento" | "calculo";
