@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import OvertimeImport, { type ImportedItem } from '@/components/overtime-import';
+import { useCallback, useEffect, useState } from 'react';
+import { replacePointOvertime } from '@/lib/payroll-items';
 import { processarEvento } from '@/lib/engine';
 import { Funcionario, ItemFolha } from '@/lib/types';
 import { Calculator, Plus, Trash2, Info, FileText } from 'lucide-react';
@@ -38,8 +40,12 @@ export default function CalcularFolhaPage() {
 
   const [codigoDigitado, setCodigoDigitado] = useState('');
   const [horasExtras, setHorasExtras] = useState(0);
-  const [itensSelecionados, setItensSelecionados] = useState<ItemFolha[]>([]);
+  const [itensSelecionados, setItensSelecionados] = useState<(ItemFolha | ImportedItem)[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [extrasLoading, setExtrasLoading] = useState(true);
+  const [erro, setErro] = useState('');
+  const [inicioPonto, setInicioPonto] = useState<string | undefined>();
+  const receberHoras = useCallback((item: ImportedItem | null) => setItensSelecionados(prev => replacePointOvertime<ItemFolha | ImportedItem>(prev, item)), []);
 
   async function carregarDados() {
     setLoading(true);
@@ -49,11 +55,17 @@ export default function CalcularFolhaPage() {
         fetch('/api/eventos-folha'),
       ]);
       const [dataFunc, dataEventos] = await Promise.all([resFunc.json(), resEventos.json()]);
+      if (!resFunc.ok || !resEventos.ok || !Array.isArray(dataFunc) || !Array.isArray(dataEventos)) throw new Error(dataFunc.error || dataEventos.error || 'Não foi possível carregar a folha.');
       setFuncionarios(dataFunc);
       setEventos(dataEventos);
       try { setIsProfessor(JSON.parse(localStorage.getItem('talentlab_current_user') || '{}').role === 'professor'); }
       catch { setIsProfessor(false); }
-      setFuncionarioSelecionadoId((prev) => prev || dataFunc[0]?.id || '');
+      const params = new URL(window.location.href).searchParams;
+      const solicitado = params.get('funcionarioId');
+      setInicioPonto(params.get('inicio') || undefined);
+      setFuncionarioSelecionadoId((prev) => prev || dataFunc.find((f: FuncionarioAPI) => f.id === solicitado)?.id || dataFunc[0]?.id || '');
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Erro de conexão.');
     } finally {
       setLoading(false);
     }
@@ -83,6 +95,7 @@ export default function CalcularFolhaPage() {
 
   const adicionarEvento = () => {
     if (!eventoAtual || !funcionarioParaCalculo) return;
+    if (eventoAtual.codigo === '0006' && itensSelecionados.some(i => i.codigoEvento === '0006')) { setErro('As horas extras deste funcionário já estão incluídas. Altere o período dos pontos para atualizar o valor.'); return; }
     const item = processarEvento(eventoAtual, funcionarioParaCalculo, horasExtras);
     setItensSelecionados([...itensSelecionados, item]);
     setCodigoDigitado('');
@@ -90,6 +103,7 @@ export default function CalcularFolhaPage() {
   };
 
   const removerEvento = (index: number) => {
+    if ('lancamentoId' in itensSelecionados[index]) return;
     setItensSelecionados(itensSelecionados.filter((_, i) => i !== index));
   };
 
@@ -114,6 +128,7 @@ export default function CalcularFolhaPage() {
 
   const baseFGTS = salarioBaseAtual + proventosComIncidenciaFGTS;
   const fgtsDoMes = baseFGTS * 0.08;
+  const itemPonto = itensSelecionados.find((item): item is ImportedItem => 'lancamentoId' in item);
 
   if (loading) {
     return <p className="p-6 text-sm text-slate-500">Carregando...</p>;
@@ -122,6 +137,7 @@ export default function CalcularFolhaPage() {
   if (!funcionarioParaCalculo) {
     return (
       <div className="space-y-4">
+        {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
         <p className="text-sm text-amber-600">Cadastre ao menos um funcionário antes de simular a folha de pagamento.</p>
         <CodeHelpButton title="Códigos de Eventos de Folha" items={eventos.map((ev) => ({ code: ev.codigo, description: `${ev.nome} — ${ev.descricaoDidatica}` }))}>
           {isProfessor && <PayrollCodeForm onCreated={(evento) => setEventos((prev) => [...prev, evento].sort((a, b) => a.codigo.localeCompare(b.codigo)))} />}
@@ -147,6 +163,7 @@ export default function CalcularFolhaPage() {
             {isProfessor && <PayrollCodeForm onCreated={(evento) => setEventos((prev) => [...prev, evento].sort((a, b) => a.codigo.localeCompare(b.codigo)))} />}
           </CodeHelpButton>
           <button
+            disabled={extrasLoading}
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2 bg-slate-900 text-white font-semibold text-xs px-4 py-2.5 rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
           >
@@ -162,7 +179,12 @@ export default function CalcularFolhaPage() {
             value={funcionarioSelecionadoId}
             onChange={(e) => {
               setFuncionarioSelecionadoId(e.target.value);
+              setInicioPonto(undefined);
               setItensSelecionados([]);
+              setExtrasLoading(true);
+              setIsModalOpen(false);
+              setCodigoDigitado('');
+              setHorasExtras(0);
             }}
             className="block mt-1 text-lg font-bold text-slate-800 border border-slate-300 rounded-lg p-2 w-full"
           >
@@ -181,6 +203,9 @@ export default function CalcularFolhaPage() {
           <p className="text-lg font-extrabold text-red-600">R$ {salarioBaseAtual.toFixed(2)}</p>
         </div>
       </div>
+
+      {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
+      <OvertimeImport key={funcionarioSelecionadoId} funcionarioId={funcionarioSelecionadoId} inicioInicial={inicioPonto} onImported={receberHoras} onPendingChange={setExtrasLoading} />
 
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -280,7 +305,7 @@ export default function CalcularFolhaPage() {
                   {item.tipo === 'DESCONTO' && '- '}R$ {item.valorCalculado.toFixed(2)}
                 </td>
                 <td className="p-3 text-center">
-                  <button onClick={() => removerEvento(idx)} className="text-slate-400 hover:text-rose-600">
+                  <button disabled={'lancamentoId' in item} title={'lancamentoId' in item ? 'Horas atualizadas automaticamente a partir dos pontos do período' : 'Remover evento'} onClick={() => removerEvento(idx)} className="text-slate-400 hover:text-rose-600">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </td>
@@ -319,6 +344,7 @@ export default function CalcularFolhaPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         dados={{
+          referencia: itemPonto ? `${itemPonto.inicio.split('-').reverse().join('/')} a ${itemPonto.fim.split('-').reverse().join('/')}` : undefined,
           empresa: funcionarioAPI?.empresa.razaoSocial ?? '',
           cnpj: funcionarioAPI?.empresa.cnpj ?? '',
           funcionario: `${funcionarioParaCalculo.id} - ${funcionarioParaCalculo.nome}`,

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:db": "node --test tests/supabase-schema.test.mjs"
+    "test:db": "node --test tests/supabase-schema.test.mjs",
+    "test:requisitos": "node --test tests/requisitos-professora.test.cjs",
+    "test:ui": "node tests/requisitos-ui.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",

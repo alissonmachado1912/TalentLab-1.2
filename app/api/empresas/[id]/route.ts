@@ -1,3 +1,4 @@
+import { companyData } from '@/lib/registration-validation';
 import { withAuth, ownerId } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, query } from '@/lib/supabase';
@@ -23,3 +24,12 @@ async function handleDELETE(
   }
 }
 export const DELETE = withAuth(handleDELETE);
+
+export const PATCH = withAuth(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
+  const body = await request.json();
+  let data;
+  try { data = companyData(body); } catch { return NextResponse.json({ error: 'Preencha os campos corretamente.' }, { status: 400 }); }
+  const record = await query(getSupabase().from('Empresa').update(data).eq('id', id).eq('ownerId', ownerId()).select('*').single());
+  return NextResponse.json(record);
+});

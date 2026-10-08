@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Briefcase, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Briefcase, Plus, Trash2, Pencil } from 'lucide-react';
 import CodeHelpButton from '@/components/code-help-button';
 
 interface CargoItem {
@@ -16,6 +16,9 @@ interface CargoItem {
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<CargoItem[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -33,6 +36,7 @@ export default function CargosPage() {
     try {
       const res = await fetch('/api/cargos');
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setCargos(data);
     } catch {
       setErro('Não foi possível carregar os cargos. Confira se o servidor está rodando.');
@@ -49,10 +53,12 @@ export default function CargosPage() {
     e.preventDefault();
     if (!form.codigo || !form.titulo || !form.salarioBase) return;
 
+    if (saving) return;
+    setSaving(true);
     setErro(null);
     try {
-      const res = await fetch('/api/cargos', {
-        method: 'POST',
+      const res = await fetch(editingId ? `/api/cargos/${editingId}` : '/api/cargos', {
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           codigo: form.codigo,
@@ -70,8 +76,8 @@ export default function CargosPage() {
         return;
       }
 
-      const novoCargo: CargoItem = await res.json();
-      setCargos((prev) => [...prev, novoCargo]);
+      await carregarCargos();
+      setEditingId(null);
       setForm({
         codigo: '',
         titulo: '',
@@ -82,7 +88,7 @@ export default function CargosPage() {
       });
     } catch {
       setErro('Erro de conexão com o servidor.');
-    }
+    } finally { setSaving(false); }
   };
 
   const handleApagar = async (id: string, titulo: string) => {
@@ -103,8 +109,8 @@ export default function CargosPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-200 pb-5">
+    <div className="tl-register space-y-7">
+      <div className="tl-page-heading">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Cadastro de Cargos & Salários</h1>
@@ -127,11 +133,11 @@ export default function CargosPage() {
         </div>
       )}
 
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="tl-form-card bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-          <Briefcase className="h-4 w-4 text-red-600" /> Cadastrar Novo Cargo
+          <Briefcase className="h-4 w-4 text-red-600" /> {editingId ? 'Editar Cargo' : 'Cadastrar Novo Cargo'}
         </h2>
-        <form onSubmit={handleCadastrar} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form ref={formRef} onSubmit={handleCadastrar} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Código ID</label>
             <input
@@ -182,7 +188,7 @@ export default function CargosPage() {
             </select>
           </div>
 
-          <div className="md:col-span-4 flex flex-wrap items-center justify-between gap-4 pt-2">
+          <div className="sm:col-span-2 xl:col-span-4 flex flex-wrap items-center justify-between gap-4 pt-2">
             <div className="flex gap-6">
               <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
                 <input
@@ -205,16 +211,17 @@ export default function CargosPage() {
             </div>
 
             <button
-              type="submit"
+              type="submit" disabled={saving}
               className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors shadow-sm"
             >
-              <Plus className="h-4 w-4" /> Cadastrar Cargo
+              <Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Cadastrar Cargo'}
             </button>
           </div>
+          {editingId && <button type="button" className="text-xs text-red-600" onClick={() => { setEditingId(null); setForm({ codigo: '', titulo: '', salarioBase: '', jornadaMensal: '220', insalubridade: false, periculosidade: false }); }}>Cancelar edição</button>}
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="tl-records bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Carregando...</p>
         ) : (
@@ -256,6 +263,7 @@ export default function CargosPage() {
                     R$ {cargo.salarioBase.toFixed(2)}
                   </td>
                   <td className="p-3 text-center">
+                    <button type="button" title="Editar cargo" aria-label="Editar cargo" disabled={saving} className="text-slate-400 hover:text-rose-600 mr-3" onClick={() => { setEditingId(cargo.id); setErro(null); setForm({ codigo: cargo.codigo, titulo: cargo.titulo, salarioBase: String(cargo.salarioBase), jornadaMensal: String(cargo.jornadaMensal), insalubridade: cargo.adicionalInsalubridade, periculosidade: cargo.adicionalPericulosidade }); formRef.current?.scrollIntoView({ block: 'start' }); }}><Pencil className="h-4 w-4" /></button>
                     <button
                       onClick={() => handleApagar(cargo.id, cargo.titulo)}
                       className="text-slate-400 hover:text-rose-600 transition-colors"

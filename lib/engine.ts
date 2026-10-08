@@ -7,6 +7,16 @@ export interface EventoParaCalculo {
   percentualFixa?: number | null;
 }
 
+export function formatPayrollHours(hours: number): string {
+  const minutes = Math.round(hours * 60);
+  const remainder = minutes % 60;
+  return `${Math.floor(minutes / 60)}h${remainder ? ` ${remainder}min` : ''}`;
+}
+
+export function formatOvertimeText(text: string): string {
+  return text.replace(/(\d+(?:[.,]\d+)?)h\b/g, (_, value: string) => formatPayrollHours(Number(value.replace(',', '.'))));
+}
+
 export function calcularINSS(salarioBruto: number): { valor: number; memoria: string } {
   // Tabela simplificada progressiva 2026 para fins didáticos
   let desconto = 0;
@@ -53,8 +63,8 @@ export function processarEvento(
     case '0006': {
       const valorHora = funcionario.salarioBase / 220;
       valor = valorHora * 1.5 * horasExtras;
-      memoria = `${horasExtras}h x (R$ ${valorHora.toFixed(2)} + 50%)`;
-      referencia = `${horasExtras}h`;
+      memoria = `${formatPayrollHours(horasExtras)} x (R$ ${valorHora.toFixed(2)} + 50%)`;
+      referencia = formatPayrollHours(horasExtras);
       break;
     }
     default: {

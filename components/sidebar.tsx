@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, Users, Briefcase, Clock, FileCheck, Calculator, PieChart, LayoutDashboard, ClipboardList, ChevronDown, UserRound, GraduationCap } from 'lucide-react';
+import { Building2, Users, Briefcase, Clock, FileCheck, Calculator, PieChart, LayoutDashboard, ClipboardList, ChevronDown, UserRound, GraduationCap, Menu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type Role = 'aluno' | 'professor';
@@ -39,6 +39,7 @@ const turmaItem = { title: 'Turmas & Alunos', href: '/cadastros/turmas', icon: G
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [role, setRole] = useState<Role>('aluno');
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ CADASTROS: true, ROTINAS: true, PROCESSOS: true });
 
@@ -60,25 +61,29 @@ export default function Sidebar() {
   });
 
   return (
-    <aside className="w-64 border-r border-neutral-200 bg-white flex flex-col justify-between shrink-0">
+    <div className="tl-navigation">
+      <button type="button" aria-controls="main-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="tl-mobile-menu"><span className="flex items-center gap-2 font-black"><span className="rounded-lg bg-red-600 px-2 py-1 text-white">TL</span> TalentLab</span><span className="flex items-center gap-2 text-xs"><Menu size={18} />Menu</span></button>
+    <aside id="main-navigation" className={`tl-sidebar ${menuOpen ? "tl-sidebar-open" : ""}`} onClick={(event) => { if ((event.target as HTMLElement).closest('a')) setMenuOpen(false); }}>
       <div>
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-neutral-100">
-          <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-[#e30613] text-white font-black shadow-sm">TL</div>
+        <div className="tl-school-label">SENAI-SP <span>Educação profissional</span></div>
+        <div className="tl-brand flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e30613] text-white font-black shadow-sm">TL</div>
           <div>
-            <h1 className="font-black text-neutral-950 leading-none">TalentLab</h1>
-            <span className="text-[10px] text-[#e30613] font-bold tracking-wider uppercase">SENAI-SP • Ambiente Educacional</span>
+            <h1 className="text-xl font-black text-neutral-900 tracking-tight leading-none">TalentLab</h1>
+            <span className="text-[9px] text-red-700 font-semibold tracking-wider uppercase">SENAI-SP · Laboratório de prática</span>
           </div>
         </div>
 
-        <nav className="p-4 space-y-3">
+        <nav aria-label="Navegação principal" className="px-4 pb-5 space-y-5">
           <Link
             href="/dashboard"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-semibold transition-colors ${pathname === '/dashboard' ? 'text-[#e30613] bg-red-50 border-l-2 border-[#e30613]' : 'text-neutral-700 hover:text-[#e30613] hover:bg-red-50'}`}
+            className={`flex items-center gap-3 px-3 py-2.5 tl-nav-item text-[13px] font-semibold transition-colors ${pathname === '/dashboard' ? 'tl-nav-active' : 'tl-nav-idle'}`}
           >
             <LayoutDashboard className="h-4 w-4" />
             Visão Geral
           </Link>
 
+          <Link href="/atividades" aria-current={pathname === '/atividades' ? 'page' : undefined} className={'tl-nav-item flex items-center gap-3 px-3 py-2.5 text-[13px] font-semibold ' + (pathname === '/atividades' ? 'tl-nav-active' : 'tl-nav-idle')}><ClipboardList className="h-4 w-4" />Atividades</Link>
           {groups.map((group) => {
             const isOpen = openGroups[group.title];
             return (
@@ -86,7 +91,7 @@ export default function Sidebar() {
                 <button
                   type="button"
                   onClick={() => toggle(group.title)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-bold tracking-[0.14em] text-neutral-400 hover:text-neutral-700 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-bold tracking-[0.14em] text-neutral-500 hover:text-red-700 transition-colors"
                   aria-expanded={isOpen}
                 >
                   <span>{group.title}</span>
@@ -101,7 +106,8 @@ export default function Sidebar() {
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-semibold transition-colors ${active ? 'text-[#e30613] bg-red-50 border-l-2 border-[#e30613]' : 'text-neutral-700 hover:text-[#e30613] hover:bg-red-50'}`}
+                          aria-current={active ? 'page' : undefined}
+                          className={`flex items-center gap-3 px-3 py-2.5 tl-nav-item text-[13px] font-semibold transition-colors ${active ? 'tl-nav-active' : 'tl-nav-idle'}`}
                         >
                           <Icon className="h-4 w-4" />
                           {item.title}
@@ -116,15 +122,16 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      <div className="p-4 border-t border-neutral-100">
-        <div className="flex items-center gap-3 p-2.5 bg-neutral-50 rounded-sm border border-neutral-200">
+      <div className="mt-auto p-4 border-t border-neutral-200">
+        <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
           <div className="h-8 w-8 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-xs">{role === 'professor' ? 'P' : 'A'}</div>
           <div>
-            <p className="text-xs font-bold text-neutral-900">{role === 'professor' ? 'Professor' : 'Aluno'}</p>
-            <p className="text-[11px] text-neutral-500">SENAI-SP</p>
+            <p className="text-xs font-bold text-neutral-800">{role === 'professor' ? 'Professor' : 'Aluno'}</p>
+            <p className="text-[11px] text-slate-500">SENAI-SP</p>
           </div>
         </div>
       </div>
     </aside>
+    </div>
   );
 }

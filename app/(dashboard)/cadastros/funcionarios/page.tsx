@@ -2,7 +2,7 @@
 
 import EmployeeDemographicsForm from '@/components/employee-demographics-form';
 import { useEffect, useState } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 
 interface Empresa {
   id: string;
@@ -23,6 +23,8 @@ interface Funcionario {
   codigo: string;
   nome: string;
   cpf: string;
+  observacoes?: string;
+  pcd?: boolean | null;
   sexo?: string | null;
   dataNascimento?: string | null;
   salarioBase: number;
@@ -36,6 +38,7 @@ export default function FuncionariosPage() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Funcionario | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -44,6 +47,8 @@ export default function FuncionariosPage() {
     codigo: '',
     nome: '',
     cpf: '',
+    observacoes: '',
+    pcd: false,
     sexo: '',
     dataNascimento: '',
     empresaId: '',
@@ -67,6 +72,8 @@ export default function FuncionariosPage() {
         resCargos.json(),
       ]);
 
+      if (!resFuncionarios.ok || !resEmpresas.ok || !resCargos.ok) throw new Error('Erro ao carregar os cadastros.');
+
       setFuncionarios(dataFuncionarios);
       setEmpresas(dataEmpresas);
       setCargos(dataCargos);
@@ -84,6 +91,8 @@ export default function FuncionariosPage() {
 
   useEffect(() => {
     carregarDados();
+    window.addEventListener('focus', carregarDados);
+    return () => window.removeEventListener('focus', carregarDados);
   }, []);
 
   // Busca o cargo pelo código digitado (ex: "C001"), ignorando maiúsculas/minúsculas
@@ -105,6 +114,8 @@ export default function FuncionariosPage() {
           codigo: form.codigo,
           nome: form.nome,
           cpf: form.cpf,
+          observacoes: form.observacoes,
+          pcd: form.pcd,
           sexo: form.sexo,
           dataNascimento: form.dataNascimento,
           empresaId: form.empresaId,
@@ -127,7 +138,9 @@ export default function FuncionariosPage() {
         codigo: '',
         nome: '',
         cpf: '',
-        sexo: '',
+        observacoes: '',
+    pcd: false,
+    sexo: '',
         dataNascimento: '',
         empresaId: empresas[0]?.id || '',
         codigoCargo: '',
@@ -157,8 +170,8 @@ export default function FuncionariosPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-200 pb-5">
+    <div className="tl-register space-y-7">
+      <div className="tl-page-heading">
         <h1 className="text-2xl font-bold text-slate-900">Banco de Colaboradores / Funcionários</h1>
         <p className="text-sm text-slate-500">
           Cadastro central de empregados. Os dados aqui alimentam automaticamente Ponto, ASO, Folha e Custos.
@@ -172,11 +185,11 @@ export default function FuncionariosPage() {
         </div>
       )}
 
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="tl-form-card bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
           <UserPlus className="h-4 w-4 text-red-600" /> Admitir Novo Funcionário Simuladamente
         </h2>
-        <form onSubmit={handleCadastrar} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form onSubmit={handleCadastrar} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           <label className="text-xs font-semibold text-slate-600">Sexo
             <select required value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })} className="block w-full mt-1"><option value="">Selecione</option><option value="MASCULINO">Masculino</option><option value="FEMININO">Feminino</option></select>
           </label>
@@ -279,6 +292,8 @@ export default function FuncionariosPage() {
             />
           </div>
 
+          <label className="text-xs font-semibold text-slate-600">Observações<textarea maxLength={10000} value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })} className="block w-full mt-1 text-sm p-2.5 rounded-lg border border-slate-300" /></label>
+          <label className="text-xs font-semibold text-slate-600">Pessoa com Deficiência (PCD)<select value={String(form.pcd)} onChange={e => setForm({ ...form, pcd: e.target.value === 'true' })} className="block w-full mt-1 text-sm p-2.5 rounded-lg border border-slate-300"><option value="false">Não</option><option value="true">Sim</option></select></label>
           <div className="flex items-end justify-end">
             <button
               type="submit"
@@ -296,7 +311,8 @@ export default function FuncionariosPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <label className="flex items-center gap-2 text-sm text-slate-600"><Search aria-hidden="true" className="h-4 w-4" /><input aria-label="Pesquisar funcionários por nome, CPF, código, empresa ou cargo" placeholder="Pesquisar funcionários" value={search} onChange={e => setSearch(e.target.value)} className="text-sm p-2.5 rounded-lg border border-slate-300" /></label>
+      <div className="tl-records bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         {loading ? (
           <p className="p-6 text-sm text-slate-500">Carregando...</p>
         ) : (
@@ -313,7 +329,7 @@ export default function FuncionariosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {funcionarios.map((func) => (
+              {funcionarios.filter(f => [f.nome, f.cpf, f.codigo, f.empresa.razaoSocial, f.cargo.titulo].some(value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(search.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()))).map((func) => (
                 <tr key={func.id} className="hover:bg-slate-50/80">
                   <td className="p-3 font-mono text-xs font-bold text-red-600">{func.codigo}</td>
                   <td className="p-3">

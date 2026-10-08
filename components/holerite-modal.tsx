@@ -7,6 +7,7 @@ interface HoleriteProps {
   isOpen: boolean;
   onClose: () => void;
   dados: {
+    referencia?: string;
     empresa: string;
     cnpj: string;
     funcionario: string;
@@ -53,7 +54,7 @@ export default function HoleriteModal({ isOpen, onClose, dados }: HoleriteProps)
             </div>
             <div className="text-right">
               <p className="font-bold text-slate-900">Recibo de Salário</p>
-              <p className="text-slate-500">Referência: 08/2026</p>
+              <p className="text-slate-500">Referência: {dados.referencia || new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}</p>
             </div>
           </div>
 
