@@ -8,7 +8,6 @@ import {
   Lock,
   Mail,
   ShieldCheck,
-  UserRound,
   CheckCircle2,
   IdCard,
 } from 'lucide-react';
@@ -19,9 +18,7 @@ const CURRENT_USER_KEY = 'talentlab_current_user';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [role, setRole] = useState<Role>('aluno');
-  const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [matricula, setMatricula] = useState('');
@@ -70,7 +67,7 @@ export default function LoginPage() {
     try {
       const response = await fetch('/api/auth/professor', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: identifier, senha: password, nome: name, mode }),
+        body: JSON.stringify({ email: identifier, senha: password, mode: 'login' }),
       });
       const data = await response.json();
       if (!response.ok) { setMessage(data.error || 'Erro ao entrar.'); return; }
@@ -137,14 +134,12 @@ export default function LoginPage() {
             <div className="mb-7">
               <p className="text-[11px] font-bold uppercase tracking-widest text-[#e30613]">Acesso ao laboratório</p>
               <h2 className="text-2xl font-black text-neutral-950 mt-2">
-                {isStudent ? 'Entre no TalentLab' : mode === 'login' ? 'Entre no TalentLab' : 'Crie seu cadastro'}
+                Entre no TalentLab
               </h2>
               <p className="text-sm text-neutral-500 mt-2">
                 {isStudent
                   ? 'Digite sua matrícula e a senha fornecida pelo professor.'
-                  : mode === 'login'
-                  ? 'Selecione seu perfil para acessar a plataforma.'
-                  : 'Cadastro simples para professor.'}
+                  : 'Selecione seu perfil para acessar a plataforma.'}
               </p>
             </div>
 
@@ -208,26 +203,7 @@ export default function LoginPage() {
               </form>
             ) : (
               <>
-                <div className="flex border-b border-neutral-200 mb-6">
-                  <button type="button" onClick={() => setMode('login')} className={`px-1 pb-3 mr-6 text-sm font-bold border-b-2 ${mode === 'login' ? 'border-[#e30613] text-[#e30613]' : 'border-transparent text-neutral-400'}`}>
-                    Acessar
-                  </button>
-                  <button type="button" onClick={() => setMode('register')} className={`px-1 pb-3 text-sm font-bold border-b-2 ${mode === 'register' ? 'border-[#e30613] text-[#e30613]' : 'border-transparent text-neutral-400'}`}>
-                    Criar cadastro
-                  </button>
-                </div>
-
                 <form onSubmit={handleSubmitProfessor} className="space-y-4">
-                  {mode === 'register' && (
-                    <div>
-                      <label className="field-label">Nome completo</label>
-                      <div className="relative">
-                        <UserRound className="field-icon" />
-                        <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" className="field-input" />
-                      </div>
-                    </div>
-                  )}
-
                   <div>
                     <label className="field-label">E-mail</label>
                     <div className="relative">
@@ -247,7 +223,7 @@ export default function LoginPage() {
                   {message && <p className="text-xs font-semibold text-red-600 bg-red-50 border border-red-100 p-3 rounded-sm">{message}</p>}
 
                   <button type="submit" className="w-full bg-[#e30613] hover:bg-[#c80510] text-white font-bold py-3 rounded-sm transition flex items-center justify-center gap-2">
-                    {mode === 'login' ? 'Entrar no TalentLab' : 'Criar cadastro'}
+                    Entrar no TalentLab
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </form>
