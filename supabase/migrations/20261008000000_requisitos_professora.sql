@@ -65,7 +65,7 @@ begin
   select "incideFGTS" into fgts from public."EventoFolha" where codigo = '0006' and tipo = 'PROVENTO';
   if not found then raise exception 'Evento 0006 não disponível.' using errcode = 'P0001'; end if;
   valor := round((p_salario / 220 * 1.5 * total / 60)::numeric, 2);
-  insert into public."FolhaPagamento" ("funcionarioId", "mesReferencia", "totalProventos", "totalDescontos", "salarioLiquido", "fgtsDoMes")
+  insert into public."Folh aPagamento" ("funcionarioId", "mesReferencia", "totalProventos", "totalDescontos", "salarioLiquido", "fgtsDoMes")
   values (p_funcionario, p_inicio::text || '/' || (p_inicio + 29)::text, p_salario + valor, 0, p_salario + valor, round(((p_salario + case when fgts then valor else 0 end) * 0.08)::numeric, 2)) returning id into folha;
   insert into public."ItemFolha" ("folhaId", "codigoEvento", tipo, referencia, "valorCalculado", "memoriaCalculo")
   values (folha, '0006', 'PROVENTO', (total::numeric / 60)::text || 'h', valor, (total::numeric / 60)::text || 'h x (R$ ' || round((p_salario / 220)::numeric, 2)::text || ' + 50%)') returning id into item;
